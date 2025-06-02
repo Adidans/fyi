@@ -7,12 +7,14 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/shirou/gopsutil/v4/cpu"
 )
 
 type model struct {
-	currTime time.Time
-	width    int
-	height   int
+	currTime   time.Time
+	cpuPercent []float64
+	width      int
+	height     int
 }
 
 type tickMsg time.Time
@@ -24,7 +26,8 @@ func tick() tea.Msg {
 
 func initialModel() model {
 	return model{
-		currTime: time.Now(),
+		currTime:   time.Now(),
+		cpuPercent: []float64{},
 	}
 }
 
@@ -43,14 +46,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tickMsg:
 		m.currTime = time.Now()
+		percent, err := cpu.Percent(0, false)
+		if err != nil {
+			m.cpuPercent = []float64{0}
+		}
+		m.cpuPercent = percent
 		return m, tick
 	}
 	return m, nil
 }
 
 func (m model) View() string {
+	if len(m.cpuPercent) == 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+			"Loading...")
+	}
 	header := "FYI"
-	body := fmt.Sprintf("Current time: %s\nPress 'q' to quit.", m.currTime.Format(time.DateTime))
+	body := fmt.Sprintf("Current Time: %s\nCPU Usage: %.2f%%", m.currTime.Format(time.DateTime), m.cpuPercent[0])
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
 		lipgloss.JoinVertical(lipgloss.Center, header, body))
 }
