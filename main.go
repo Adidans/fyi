@@ -5,12 +5,41 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/shirou/gopsutil/v4/cpu"
 )
 
+type keyMap struct {
+	Quit key.Binding
+}
+
+var keys = keyMap{
+	Quit: key.NewBinding(
+		key.WithKeys("q", "ctrl+c"),
+		key.WithHelp("q", "quit"),
+	),
+}
+
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		k.Quit,
+	}
+}
+
+func (k keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{
+			k.Quit,
+		},
+	}
+}
+
 type model struct {
+	keys       keyMap
+	help       help.Model
 	currTime   time.Time
 	cpuPercent []float64
 	width      int
@@ -28,6 +57,8 @@ func initialModel() model {
 	return model{
 		currTime:   time.Now(),
 		cpuPercent: []float64{},
+		keys:       keys,
+		help:       help.New(),
 	}
 }
 
@@ -41,7 +72,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case tea.KeyMsg:
-		if msg.String() == "q" || msg.String() == "ctrl+c" {
+		switch {
+		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
 		}
 	case tickMsg:
@@ -62,9 +94,10 @@ func (m model) View() string {
 			"Loading...")
 	}
 	header := "FYI"
+	help := m.help.View(m.keys)
 	body := fmt.Sprintf("Current Time: %s\nCPU Usage: %.2f%%", m.currTime.Format(time.DateTime), m.cpuPercent[0])
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-		lipgloss.JoinVertical(lipgloss.Center, header, body))
+		lipgloss.JoinVertical(lipgloss.Center, header, body, help))
 }
 
 func main() {
